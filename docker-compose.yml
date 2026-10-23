@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: payguard-server
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PORT=5000
+      - DATABASE_PATH=/data/payguard.db
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-sk_test_payguard_secret_key}
+      - FLUTTERWAVE_SECRET_HASH=${FLUTTERWAVE_SECRET_HASH:-flw_test_payguard_secret_hash}
+      - TARGET_WEBHOOK_URL=${TARGET_WEBHOOK_URL:-http://localhost:5000/api/mock-merchant/success}
+      - MAX_RETRY_ATTEMPTS=${MAX_RETRY_ATTEMPTS:-3}
+      - BASE_RETRY_DELAY_SECONDS=${BASE_RETRY_DELAY_SECONDS:-5}
+      - AUTO_RETRY_WORKER=${AUTO_RETRY_WORKER:-true}
+    volumes:
+      - payguard_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: payguard-dashboard
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  payguard_data:
